@@ -1,0 +1,8 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: ${project.artifactId}
+Bundle-SymbolicName: ${project.groupId}:${project.artifactId}
+Bundle-Version: ${osgi.version}
+Clojure-Require: com.annadaletech.nexus.core.main
+Clojure-ActivatorNamespace: com.annadaletech.nexus.core.main
+Import-Package: clojure;version="${clojure.version}",
