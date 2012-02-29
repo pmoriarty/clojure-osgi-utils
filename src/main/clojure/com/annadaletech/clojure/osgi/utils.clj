@@ -1,6 +1,5 @@
 (ns com.annadaletech.clojure.osgi.utils
   (:use
-    clojure.java.io
     clojure.tools.namespace
     ))
 
