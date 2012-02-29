@@ -1,5 +1,6 @@
 (ns com.annadaletech.clojure.osgi.utils
   (:use
+    clojure.pprint
     clojure.tools.namespace
     ))
 
@@ -30,8 +31,10 @@
       ;libspecs
       (symbol? reference) (get-base reference)
       ;prefix lists
-      (sequential? reference) (if (keyword? (second reference)) (get-base (first reference))
-                                                                (name (first reference)))
+      (sequential? reference) (cond
+                                (= 1 (count reference)) (get-base (first reference))
+                                (keyword? (second reference)) (get-base (first reference))
+                                :else (name (first reference)))
       ;flags
       (keyword? reference) nil)))
 
@@ -51,8 +54,14 @@
         required-packages (into #{} (map get-package requires))
         imports (reduce concat [] (map (partial get-ns-libs :import) ns-decls))
         imported-packages (into #{} (map get-package imports))]
+;    (println "declared: " \newline (with-out-str (pprint (sort declared-packages))))
+;    (println "used: " \newline (with-out-str (pprint (sort used-packages))))
+;    (println "required: " \newline (with-out-str (pprint (sort required-packages))))
+;    (println "ignored: " \newline (with-out-str (pprint (sort ignored-packages))))
+;    (println "imported: " \newline (with-out-str (pprint (sort imported-packages))))
     (for [ns (concat used-packages required-packages imported-packages)
           :when (and ns
+                     (not (.startsWith ns "java."))
                      (not (declared-packages ns))
                      (not (ignored-packages ns))
                      (not (.contains manifest ns)))]

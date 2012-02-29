@@ -31,6 +31,8 @@
     (is (= "x.y" (get-package 'x.y.z)))
     (is (nil? (get-package 'x)))
     (is (= "x" (get-package '[x.y :as z])))
+    (is (= "x" (get-package '[x.y :exclude z])))
+    (is (= "x" (get-package '[x.y])))
     )
   (testing "prefix lists"
     (is (= "x.y" (get-package '[x.y z])))
@@ -44,13 +46,13 @@
 (deftest find-missing-imports-tests
   (with-redefs [find-ns-decls-in-dir
                 (fn [dir]
-                  '((ns ns1 (:use a1.b1 [c1 d]) (:require x1 [y1.z :as zz]) (:import d1.e1.f))
-                     (ns ns2 (:use a2.b2 [c2 d]) (:require x2 [y2.z :as zz]) (:import d2.e2.f))
+                  '((ns ns1 (:use a1.b1 [c1 d]) (:require x1 [y1.z :as zz]) (:import d1.e1.f java.io.File javax.servlet.HttpServletRequest))
+                     (ns ns2 (:use a2.b2 [c2 d]) (:require x2 [y2.z :as zz]) (:import d2.e2.f java.util.concurrent.Future))
                      ))]
     (let [base-dir 'dummy-dir
           manifest ""
           ignored-packages []]
-      (is (= ["c1" "c2" "a1" "a2" "y1" "y2" "d1.e1" "d2.e2"] (find-missing-imports base-dir manifest ignored-packages)))
+      (is (= ["c1" "c2" "a1" "a2" "y1" "y2" "d1.e1" "d2.e2" "javax.servlet"] (find-missing-imports base-dir manifest ignored-packages)))
       )))
 
 
