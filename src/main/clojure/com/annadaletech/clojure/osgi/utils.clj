@@ -1,8 +1,16 @@
 (ns com.annadaletech.clojure.osgi.utils
   (:use
+    clojure.java.io
     clojure.pprint
     clojure.tools.namespace
-    ))
+    )
+  (:import
+    [java.util Map]
+    [java.util.jar Manifest]
+    [aQute.libg.header OSGiHeader])
+  )
+
+
 
 (defn get-ns-libs
   "Returns a seq of libs of the given type (:use, :require, :import) from the namespace declaration."
@@ -38,14 +46,27 @@
       ;flags
       (keyword? reference) nil)))
 
+(defn get-manifest-attr
+  "Returns a seq of packages (Strings) from the given manifest Import-Package header"
+  [^Manifest manifest attr]
+  (-> manifest (.getMainAttributes) (.getValue attr)))
+
+(defn get-osgi-header-packages
+  ""
+  [header]
+  (seq (.keySet (OSGiHeader/parseHeader header))))
+
 (defn find-missing-imports
   "Finds packages in use/require/import declarations in clojure source files in base-dir
    and checks that all are present in the manifest file.
+   manifest will be coerced to an InputStream using java.io.input-stream
    Takes seq of ignored-packages (Strings) to exclude certain packages from consideration.
    Also excludes any packages provided by the clojure source files in base-dir.
    "
   [base-dir manifest ignored-packages]
-  (let [ignored-packages (into #{} ignored-packages)
+  (let [manifest (Manifest. (input-stream manifest))
+        manifest-imports (into #{} (get-osgi-header-packages (get-manifest-attr manifest "Import-Package")))
+        ignored-packages (into #{} ignored-packages)
         ns-decls (find-ns-decls-in-dir base-dir)
         declared-packages (into #{} (map (comp get-package get-ns-name) ns-decls))
         uses (reduce concat [] (map (partial get-ns-libs :use) ns-decls))
@@ -64,5 +85,5 @@
                      (not (.startsWith ns "java."))
                      (not (declared-packages ns))
                      (not (ignored-packages ns))
-                     (not (.contains manifest ns)))]
+                     (not (manifest-imports ns)))]
       ns)))
