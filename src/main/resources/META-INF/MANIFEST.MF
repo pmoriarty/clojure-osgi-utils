@@ -1,7 +1,0 @@
-Manifest-Version: 1.0
-Bundle-ManifestVersion: 2
-Bundle-Name: ${project.artifactId}
-Bundle-SymbolicName: ${project.groupId}:${project.artifactId}
-Bundle-Version: ${osgi.version}
-Export-Package: com.annadaletech.clojure.osgi;version="${project.version}"
-Import-Package: clojure.tools;version="[0.1.1]",clojure.java;version="[0.1.1]"
