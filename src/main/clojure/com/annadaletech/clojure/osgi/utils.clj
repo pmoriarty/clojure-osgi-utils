@@ -5,12 +5,16 @@
     clojure.tools.namespace
     )
   (:import
-    [java.util Map]
+    [java.util Map HashMap]
     [java.util.jar Manifest]
-    [aQute.libg.header OSGiHeader])
+    [aQute.libg.header OSGiHeader]
+    [aQute.lib.osgi Analyzer Processor Jar]
+    [java.io IOException])
   )
 
 
+(def IMPORT-PACKAGE "Import-Package")
+(def EXPORT-PACKAGE "Export-Package")
 
 (defn get-ns-libs
   "Returns a seq of libs of the given type (:use, :require, :import) from the namespace declaration."
@@ -63,27 +67,72 @@
    Takes seq of ignored-packages (Strings) to exclude certain packages from consideration.
    Also excludes any packages provided by the clojure source files in base-dir.
    "
-  [base-dir manifest ignored-packages]
-  (let [manifest (Manifest. (input-stream manifest))
-        manifest-imports (into #{} (get-osgi-header-packages (get-manifest-attr manifest "Import-Package")))
+  [base-dir ^Manifest manifest ignored-packages]
+  (let [manifest-imports (into #{} (get-osgi-header-packages (get-manifest-attr manifest IMPORT-PACKAGE)))
         ignored-packages (into #{} ignored-packages)
         ns-decls (find-ns-decls-in-dir base-dir)
         declared-packages (into #{} (map (comp get-package get-ns-name) ns-decls))
         uses (reduce concat [] (map (partial get-ns-libs :use) ns-decls))
-        used-packages (into #{} (map get-package uses))
+        used-packages (map get-package uses)
         requires (reduce concat [] (map (partial get-ns-libs :require) ns-decls))
-        required-packages (into #{} (map get-package requires))
+        required-packages (map get-package requires)
         imports (reduce concat [] (map (partial get-ns-libs :import) ns-decls))
-        imported-packages (into #{} (map get-package imports))]
-;    (println "declared: " \newline (with-out-str (pprint (sort declared-packages))))
-;    (println "used: " \newline (with-out-str (pprint (sort used-packages))))
-;    (println "required: " \newline (with-out-str (pprint (sort required-packages))))
-;    (println "ignored: " \newline (with-out-str (pprint (sort ignored-packages))))
-;    (println "imported: " \newline (with-out-str (pprint (sort imported-packages))))
-    (for [ns (concat used-packages required-packages imported-packages)
+        imported-packages (map get-package imports)]
+    (for [ns (sort (into #{} (concat ["clojure"] used-packages required-packages imported-packages)))
           :when (and ns
                      (not (.startsWith ns "java."))
                      (not (declared-packages ns))
                      (not (ignored-packages ns))
                      (not (manifest-imports ns)))]
-      ns)))
+      (namespace-munge ns))))
+
+(defn find-missing-exports
+  "Finds decsared namespaces in clojure source files in base-dir
+   and checks that all are present in the manifest file.
+   manifest will be coerced to an InputStream using java.io.input-stream
+   Takes seq of ignored-packages (Strings) to exclude certain packages from consideration.
+   "
+  [base-dir ^Manifest manifest ignored-packages]
+  (let [manifest-exports (into #{} (get-osgi-header-packages (get-manifest-attr manifest EXPORT-PACKAGE)))
+        ignored-packages (into #{} ignored-packages)
+        ns-decls (find-ns-decls-in-dir base-dir)
+        declared-packages (into #{} (map (comp get-package get-ns-name) ns-decls))]
+    (for [ns (sort declared-packages)
+          :when (and ns
+                     (not (ignored-packages ns))
+                     (not (manifest-exports ns)))]
+      (namespace-munge ns))))
+
+(defn add-packages
+  "Adds given imported packages to the manifest's Import-Package attribute."
+  [^Manifest manifest header-name packages]
+  (let [header (OSGiHeader/parseHeader (get-manifest-attr manifest header-name))
+        manifest (Manifest. manifest)]
+    (doseq [package packages]
+      (.put header package (HashMap.)))
+    (-> manifest
+      (.getMainAttributes)
+      (.putValue header-name (Processor/printClauses header)))
+    manifest))
+
+(defn add-package-imports
+  "Adds packages to the manifest's Import-Package attribute."
+  [^Manifest manifest new-imports]
+  (add-packages manifest IMPORT-PACKAGE new-imports))
+
+(defn add-package-exports
+  "Adds packages to the manifest's Export-Package attribute."
+  [^Manifest manifest new-exports]
+  (add-packages manifest EXPORT-PACKAGE new-exports))
+
+
+(defn read-manifest
+  "Reads a Manifest from the given file (or filename) f"
+  [f]
+  (Manifest. (input-stream f)))
+
+(defn write-manifest
+  "Write the given manifest object to the file (or filename) f"
+  [^Manifest manifest f]
+  (with-open [os (output-stream f)]
+    (Jar/writeManifest manifest os)))
