@@ -3,8 +3,9 @@
 Utilities for creating OSGi manifests for Clojure projects.
 
 Maven:
+
 ```
-<dependency>  
+<dependency>
   <groupId>com.annadaletech</groupId>
   <artifactId>clojure-osgi-utils</artifactId>
   <version>0.1.3</version>
